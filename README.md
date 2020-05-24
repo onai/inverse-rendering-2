@@ -1,86 +1,49 @@
-# redner
+Inverse rendering seeks to find the scene parameters given observed images. With the scene parameters, changes in the output 2D image can be back-propagated to get parameters to render a 3D scene. Besides general better human analyst understanding, this technique can be used for several applications:
+1.  Discovering adversarial examples of 3D scenes that fool a neural network. It can do this by allowing generation of samples with different settings like camera pose, light intensity, light source position, global translation, rotation, and vertex displacement [0].
+2. Estimating human body shape from depth sensors and RGB data [1].
+3. 2D to 3D style transfer [2].
+4. 3D deep dream [2].
 
-redner is a differentiable Monte Carlo renderer that can take the derivatives of rendering output with respect to arbitrary 
-scene parameters, that is, you can backpropagate from the image to your 3D scene. One of the major usages of redner is inverse rendering (hence the name redner) through gradient descent. A distinct feature of redner is that it is physically-based -- which means it simulates photons and produce realistic lighting phenomena, such as shadow and global illumination, and it handles the derivatives of these features correctly.
 
-For more details on the renderer, what it can do, and the techniques it uses for computing the derivatives, please
-take a look at the paper:
-"Differentiable Monte Carlo Ray Tracing through Edge Sampling", Tzu-Mao Li, Miika Aittala, Fredo Durand, Jaakko Lehtinen
-[https://people.csail.mit.edu/tzumao/diffrt/]
-Since the submission we have improved the renderer a bit. In particular we implemented a CUDA backend and accelerated
-the continuous derivatives significantly by replacing automatic differentiation with hand derivatives.
+# Table Of Contents
 
-redner is expected to be used with [PyTorch](https://pytorch.org/), and can be used seamlessly with PyTorch operators.
-While the documentation is work in progress, you can take a look at the [tests directory](tests) to have a basic sense.
-A good starting point is to look at [tests/test_single_triangle.py](https://github.com/BachiLi/redner/blob/master/tests/test_single_triangle.py) where we optimize for the vertex positions of a single triangle.
-redner inherits a subset of [Mitsuba](http://www.mitsuba-renderer.org) scene format,
-see [tests/test_teapot_reflectance.py](https://github.com/BachiLi/redner/blob/master/tests/test_teapot_reflectance.py) and [tests/test_teapot_specular.py](https://github.com/BachiLi/redner/blob/master/tests/test_teapot_specular.py) for examples of loading Mitsuba scene files. There is also a Wavefront obj file loader for individual meshes, take a look at [pyredner/load_obj.py](https://github.com/BachiLi/redner/blob/master/pyredner/load_obj.py).
+1. [How To Run](#how-to-run)
+2. [Background](#Background)
+3. [References](#References)
 
-redner depends on a few libraries/systems:
-- [Python 3.6 or above](https://www.python.org) (required)
-- [pybind11](https://github.com/pybind/pybind11) (required)
-- [PyTorch 0.4.1 or 1.0](https://pytorch.org) (required)
-- [OpenEXR](https://github.com/openexr/openexr) (required)
-- [OpenEXR Python](https://github.com/jamesbowman/openexrpython) (required, just clone the repo and python setup.py install)
-- [Embree](https://embree.github.io) (required)
-- [Thrust](https://thrust.github.io) (required, included in a submodule)
-- [miniz](https://github.com/richgel999/miniz) (already in this repository)
-- [CUDA 10](https://developer.nvidia.com/cuda-downloads) (optional)
-- [optix prime](https://developer.nvidia.com/optix) (optional, required when compiled with CUDA)
-- [miniconda](https://conda.io/miniconda.html) (optional, but recommended)
-- A few other python packages: numpy, scikit-image
+# How To Run
+1. Build the Dockerfile with `docker build -t inverse-renderer .`
+2. Run the container with `docker run -it inverse-renderer`
+3. Find the results of rotated to upright square example explained in the next section in `cd redner/tests/results`
 
-I recommend using conda to setup the Python related dependencies, e.g.:
-```
-conda install pybind11
-conda install pytorch-nightly -c pytorch
-```
+# Background
 
-redner uses [CMake](https://cmake.org) as its build system. You need CMake 3.12 or above to build redner.
-The build procedure follows common CMake instructions.
-Ideally,
-```
-mkdir build
-cd build
-cmake ..
-make install -j 8
-```
-should build and install the project, but you may need to tell CMake where the dependencies are by defining
-the following variables:
-```
-Python_INCLUDE_DIRS
-Python_LIBRARIES
-EMBREE_INCLUDE_PATH
-EMBREE_LIBRARY
-OptiX_INCLUDE
-CUDA_LIBRARIES
-THRUST_INCLUDE_DIR
-optix_prime_LIBRARY
-CUDA_curand_LIBRARY
-```
-I suggest using ccmake or other interfaces of cmake to setup the variables.
+The Redner paper [0] introduces a general-purpose differentiable ray tracer, which is the first comprehensive solution to compute derivatives of scalar functions over a rendered image with respect to arbitrary scene parameters. Computing the gradient of rendering is challenging because the rendering integral includes visibility terms that are not differentiable. Previous work in differentiable rendering has focused on fast, approximate solutions using simpler rendering models that only handle primary visibility, and ignore secondary effects such as shadows and indirect light [2][3]. In this work, the authors propose an algorithm to compute derivatives of scalar functions over a physically-based rendered image with respect to arbitrary input parameters (camera, light materials, geometry, etc.). They integrate the differentiable ray tracer with the automatic differentiation library PyTorch [4] for efficient integration with optimization and learning approaches. The scene geometry, lighting, camera and materials are parameterized by PyTorch tensors, which enables a complex combination of 3D graphics, light transport, and neural networks. Backpropagation runs seamlessly across PyTorch and the renderer. Redner’s source code has been released and is available on GitHub [5] 
+Redner can optimize camera position, diffuse/specular reflectance, roughness of the teapot as shown in Fig. 1
 
-redner is tested under MacOS with clang 6.0 and Ubuntu with gcc 7.0. Windows is not tested yet but should be
-portable with moderate modification. In general any compiler with c++14 support should work.
 
-The current development plan is to enhance the renderer. Following features will be added in the near future (not listed in any particular order):
-- Environment map
-- Non-black background
-- Stratification of random number
-- More BSDFs e.g. glass/GGX
-- A properer secondary edge sampling strategy 
-  (to make the renderer computation friendlier to GPU, we temporarily dropped the hierarchical edge sampling algorithm described in the paper, and instead used an importance resampling strategy.
-   see [edge.cpp](https://github.com/BachiLi/redner/blob/master/edge.cpp) )
-- Support for edge shared by more than two triangles
-  (The code currently assumes every triangle edge is shared by at most two triangles.
-   If your mesh doesn't satisfy this, you can preprocess it in other mesh processing softwares such as [MeshLab](http://www.meshlab.net))
-- Source-to-source automatic differentiation
-- Mipmapping
-- Russian roulette
-- Distribution effects: depth of field/motion blur
-- Proper pixel filter (currently only support 1x1 box filter)
-- Mini-batching
-- Documentation
+![Figure1](images/image1.png)
+<p align="center">Fig. 1: (a) Initial rendered scene (b) Target image (c) Rendered from learned scene parameters from target image</p>
 
-If you have any questions/comments/bug reports, feel free to open a github issue or e-mail to the author
-Tzu-Mao Li (tzumao@mit.edu)
+
+Redner offers rendering APIs to draw 3D shapes, choosing the material of the shapes, and adding EXR [6] images into a scene. In addition, camera parameters can also be specified. Shapes can be constructed by specifying the vertices of a triangle. Polygons and therefore any sort of shape can be rendered by specifying shapes in vertices of a triangle.
+After rendering a scene, a view (an image) from the scene can be modified and then the gradients can be calculated back to the parameters of the scene. In other words, we can find the parameters that were used to render a modified image.
+As a first test to confirm our understanding of the system, we made the necessary modifications to be able to render a scene with a rotated square (Fig. 2a) and then changed it to an upright square (Fig. 2b) and calculated the gradients. Using the resulting parameters from the gradients, we rendered the scene again with the parameters of an upright square (Fig. 2c).
+
+![Figure2](images/image2.png)
+<p align="center">Fig.2: (a) Rendering a scene (source) (b) Changing the scene (target) (c) Calculating the gradients and rendering the modified scene again with learned parameters.</p>
+
+# References
+[0] Li, Tzu-Mao and Aittala, Miika and Durand, Fredo and Lehtinen, Jaakko. Differentiable Monte Carlo Ray Tracing through Edge Sampling. ACM Trans. Graph. (Proc. SIGGRAPH Asia) 2018, Vol. 37. 222:1-222:11.
+
+[1] Matthew M. Loper and Michael J. Black. 2014. OpenDR: An Approximate Differentiable Renderer. In European Conference on Computer Vision, Vol. 8695. 154–169.
+
+[2] Hiroharu Kato, Yoshitaka Ushiku, and Tatsuya Harada. 2018. Neural 3D Mesh Renderer. In Conference on Computer Vision and Pattern Recognition. 3907–3916.
+
+[3] Matthew M. Loper and Michael J. Black. 2014. OpenDR: An Approximate Differentiable Renderer. In European Conference on Computer Vision, Vol. 8695. 154–169.
+
+[4] Adam Paszke, Sam Gross, Soumith Chintala, Gregory Chanan, Edward Yang, Zachary DeVito, Zeming Lin, Alban Desmaison, Luca Antiga, and Adam Lerer. 2017. Automatic differentiation in PyTorch. (2017).
+
+[5] Redner source code: https://github.com/BachiLi/redner
+
+[6] Kainz, F and Bogart, R and Hess, D. OpenEXR image file format. 2004

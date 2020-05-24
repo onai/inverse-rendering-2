@@ -33,13 +33,13 @@ mat_black = pyredner.Material(\
     device = pyredner.get_device()))
 materials = [mat_green,mat_red,mat_black]
 tri0_vertices = torch.tensor(\
-    [[-1.7,1.0,0.0], [1.0,1.0,0.0], [-0.5,-1.0,0.0]],
+    [[-1.0,2.0,0.0], [2.0,2.0,0.0], [-1.0,-1.0,0.0]],
     device = pyredner.get_device())
 tri1_vertices = torch.tensor(\
-    [[-1.0,1.5,1.0], [0.2,1.5,1.0], [0.2,-1.5,1.0]],
+    [[2.0,-1.0,0.0], [2.0,2.0,0.0], [-1.0,-1.0,0.0]],
     device = pyredner.get_device())
 tri0_indices = torch.tensor([[0, 1, 2]], dtype = torch.int32, device = pyredner.get_device())
-tri1_indices = torch.tensor([[0, 1, 2]], dtype = torch.int32, device = pyredner.get_device())
+tri1_indices = torch.tensor([[0, 2, 1]], dtype = torch.int32, device = pyredner.get_device())
 shape_tri0 = pyredner.Shape(tri0_vertices, tri0_indices, None, None, 0)
 shape_tri1 = pyredner.Shape(tri1_vertices, tri1_indices, None, None, 1)
 light_vertices = torch.tensor(\
@@ -70,11 +70,11 @@ if pyredner.get_use_gpu():
 
 # Perturb the scene, this is our initial guess
 shape_tri0.vertices = torch.tensor(\
-    [[-1.3,1.5,0.1], [1.5,0.7,-0.2], [-0.8,-1.1,0.2]],
+    [[-1.0,1.0,0.3], [1.0,2.0,0.3], [0.0,-1.0,0.3]],
     device = pyredner.get_device(),
     requires_grad=True)
 shape_tri1.vertices = torch.tensor(\
-    [[-0.5,1.2,1.2], [0.3,1.7,1.0], [0.5,-1.8,1.3]],
+    [[2.0,0.0,0.3], [1.0,2.0,0.3], [0.0,-1.0,0.3]],
     device = pyredner.get_device(),
     requires_grad=True)
 args = pyredner.RenderFunction.serialize_scene(\
